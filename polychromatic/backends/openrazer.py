@@ -1319,22 +1319,29 @@ class OpenRazerBackend(Backend):
         """
         FAN_MODE_AUTOMATIC = 0x00
         FAN_MODE_MANUAL = 0x01
-        FIRST_FAN = 0x00
 
-        class FanModeOption(Backend.ToggleOption):
-            def __init__(self, rdevice, speed_option):
+        FAN_1 = 0x00
+
+        CPU_BALANCED = 0x00
+        CPU_GAMING = 0x01
+        CPU_CREATIVE = 0x02
+        CPU_CUSTOM = 0x04  # CPU boost and GPU boost power?
+
+        class FanModeOption(Backend.MultipleChoiceOption):
+            def __init__(self, rdevice, speed_option, _):
                 super().__init__()
                 self._rdevice = rdevice
                 self._speed = speed_option
                 self.uid = "fan_mode"
+                self.label = _("CPU/Fan Tuning")
 
             def refresh(self):
                 self.active = True if self._rdevice.fan_mode == FAN_MODE_AUTOMATIC else False
 
-            def apply(self, enabled):
+            def apply(self, param):
                 self._speed.refresh()
-                self._rdevice.set_fan_speed(FIRST_FAN, self._speed.value)
-                self._rdevice.set_fan_mode(FIRST_FAN, FAN_MODE_AUTOMATIC if enabled else FAN_MODE_MANUAL)
+                self._rdevice.fx.fan_speed(FAN_1, self._speed.value)
+                self._rdevice.fx.fan_mode(FAN_1, param.data)
 
         class FanSpeedOption(Backend.SliderOption):
             def __init__(self, rdevice):
@@ -1344,15 +1351,14 @@ class OpenRazerBackend(Backend):
                 self.min = 50
                 self.max = 100
                 self.step = 5
-                self.suffix = "%"
-                self.suffix_plural = "%"
+                self.suffix = self.suffix_plural = "%"
 
             def refresh(self):
                 self.active = int(self._rdevice.fan_speed)
 
             def apply(self, speed):
-                self._rdevice.set_fan_speed(FIRST_FAN, int(speed))
-                self._rdevice.set_fan_mode(FIRST_FAN, FAN_MODE_MANUAL)
+                self._rdevice.fan_speed(FAN_1, int(speed))
+                self._rdevice.fan_mode(FAN_1, FAN_MODE_MANUAL)
 
         fan_speed = FanSpeedOption(rdevice)
         fan_speed.label =  self._("Fan Speed")
@@ -1364,6 +1370,13 @@ class OpenRazerBackend(Backend):
         fan_mode.label_enable = "Automatic"
         fan_mode.label_disable = "Manual"
         fan_mode.label_toggle = "Automatic"
+
+        # TODO: Add parameters for fan mode / CPU mode
+        #random = Backend.Option.Parameter()
+        #random.data = "random"
+        #random.label = self._("Random")
+        #random.icon = self.get_icon("params", "random")
+        #option.parameters.append(random)
 
         return [fan_mode, fan_speed]
 
