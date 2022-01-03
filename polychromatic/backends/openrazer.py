@@ -248,6 +248,8 @@ class OpenRazerBackend(Backend):
             device.dpi = None
             main_zone.options.append(self._get_dpi_fixed_object(rdevice))
 
+        if rdevice.has("set_fan_speed"):
+            main_zone.options += self._get_fan_options()
 
         if rdevice.has("poll_rate"):
             main_zone.options.append(self._get_poll_rate_option(rdevice))
@@ -1310,6 +1312,60 @@ class OpenRazerBackend(Backend):
         option.icon_enable = self.get_icon("options", "game_mode")
         option.icon_disable = self.get_icon("options", "game_mode_off")
         return option
+
+    def _get_fan_options(self, rdevice):
+        """
+        Returns a list of Backend.Option derivative objects to control the hardware fan.
+        """
+        FAN_MODE_AUTOMATIC = 0x00
+        FAN_MODE_MANUAL = 0x01
+        FIRST_FAN = 0x00
+
+        class FanModeOption(Backend.ToggleOption):
+            def __init__(self, rdevice, speed_option):
+                super().__init__()
+                self._rdevice = rdevice
+                self._speed = speed_option
+                self.uid = "fan_mode"
+
+            def refresh(self):
+                self.active = True if self._rdevice.fan_mode == FAN_MODE_AUTOMATIC else False
+
+            def apply(self, enabled):
+                self._speed.refresh()
+                self._rdevice.set_fan_speed(FIRST_FAN, self._speed.value)
+                self._rdevice.set_fan_mode(FIRST_FAN, FAN_MODE_AUTOMATIC if enabled else FAN_MODE_MANUAL)
+
+        class FanSpeedOption(Backend.SliderOption):
+            def __init__(self, rdevice):
+                super().__init__()
+                self._rdevice = rdevice
+                self.uid = "fan_speed"
+                self.min = 50
+                self.max = 100
+                self.step = 5
+                self.suffix = "%"
+                self.suffix_plural = "%"
+
+            def refresh(self):
+                self.active = int(self._rdevice.fan_speed)
+
+            def apply(self, speed):
+                self._rdevice.set_fan_speed(FIRST_FAN, int(speed))
+                self._rdevice.set_fan_mode(FIRST_FAN, FAN_MODE_MANUAL)
+
+        fan_speed = FanSpeedOption(rdevice)
+        fan_speed.label =  self._("Fan Speed")
+        fan_speed.icon = self.get_icon("devices", "fan")
+
+        fan_mode = FanModeOption(rdevice, fan_speed)
+        fan_mode.label = self._("Fan Mode")
+        fan_mode.icon = self.get_icon("devices", "fan")
+        fan_mode.label_enable = "Automatic"
+        fan_mode.label_disable = "Manual"
+        fan_mode.label_toggle = "Automatic"
+
+        return [fan_mode, fan_speed]
 
     def _get_battery_options(self, rdevice):
         """
